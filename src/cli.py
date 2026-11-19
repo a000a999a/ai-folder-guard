@@ -124,8 +124,9 @@ def cmd_uninstall(args):
 
 def cmd_serve(args):
     port = args.port or 7799
+    host = args.host or "127.0.0.1"
     import ui
-    ui.app.run(host="127.0.0.1", port=port)
+    ui.app.run(host=host, port=port)
 
 
 def cmd_log(args):
@@ -173,6 +174,7 @@ def main():
 
     ps = sub.add_parser("serve", help="Start web UI")
     ps.add_argument("--port", type=int, default=7799)
+    ps.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1, use 0.0.0.0 for LAN)")
 
     pl = sub.add_parser("log", help="Show audit log")
     pl.add_argument("--n", type=int, default=20)

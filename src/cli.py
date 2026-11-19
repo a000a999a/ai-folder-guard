@@ -6,7 +6,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 import core
-from adapters import claude_code, ignore_file
+from adapters import claude_code, ignore_file, shell_guards, git_hooks
 
 
 def cmd_add(args):
@@ -89,6 +89,8 @@ def cmd_action(args):
 def cmd_status(args):
     cfg = core.load()
     cc = claude_code.is_installed()
+    sg = shell_guards.status()
+    gh = git_hooks.status()
     print(f"Config: {core.CONFIG_FILE}")
     print(f"Mode:   {cfg['mode']}")
     print(f"Action: {cfg['action']}")
@@ -96,14 +98,28 @@ def cmd_status(args):
     print(f"Allowed paths: {len(cfg['allowed'])}")
     print(f"Exempt paths:  {len(cfg['exempt'])}")
     print(f"Claude Code hook: {'installed' if cc else 'not installed'}")
+    for cmd, active in sg.items():
+        print(f"Shell guard ({cmd}): {'installed' if active else 'not installed'}")
+    for hook, active in gh.items():
+        print(f"Git hook ({hook}): {'installed' if active else 'not installed'}")
 
 
 def cmd_install(args):
-    tools = args.tool if args.tool != ["all"] else ["claude-code"]
+    tools = args.tool if args.tool != ["all"] else \
+        ["claude-code", "shell-guards", "git-hooks"]
     for tool in tools:
         if tool == "claude-code":
             claude_code.install()
             print("Claude Code hook installed.")
+        elif tool == "shell-guards":
+            installed = shell_guards.install()
+            if installed:
+                print(f"Shell guards installed for: {', '.join(installed)}")
+            else:
+                print("Shell guards: nothing new to install.")
+        elif tool == "git-hooks":
+            ok = git_hooks.install()
+            print("Global git hooks installed." if ok else "Git hooks: skipped (see warnings above).")
         elif tool in ("cursor", "copilot", "aider", "continue", "cline"):
             project = args.project or os.getcwd()
             out = ignore_file.write(project, tool)
@@ -113,11 +129,18 @@ def cmd_install(args):
 
 
 def cmd_uninstall(args):
-    tools = args.tool if args.tool != ["all"] else ["claude-code"]
+    tools = args.tool if args.tool != ["all"] else \
+        ["claude-code", "shell-guards", "git-hooks"]
     for tool in tools:
         if tool == "claude-code":
             claude_code.uninstall()
             print("Claude Code hook removed.")
+        elif tool == "shell-guards":
+            removed = shell_guards.uninstall()
+            print(f"Shell guards removed: {', '.join(removed) if removed else 'none found'}.")
+        elif tool == "git-hooks":
+            git_hooks.uninstall()
+            print("Global git hooks removed.")
         else:
             print(f"Uninstall for '{tool}' not supported (delete the ignore file manually).")
 
@@ -165,12 +188,13 @@ def main():
 
     pi = sub.add_parser("install", help="Install adapter(s)")
     pi.add_argument("--tool", nargs="+", default=["claude-code"],
-                    choices=["claude-code", "cursor", "copilot", "aider", "continue", "cline", "all"])
+                    choices=["claude-code", "shell-guards", "git-hooks",
+                             "cursor", "copilot", "aider", "continue", "cline", "all"])
     pi.add_argument("--project", help="Project dir for ignore-file adapters (default: cwd)")
 
     pu = sub.add_parser("uninstall", help="Uninstall adapter(s)")
     pu.add_argument("--tool", nargs="+", default=["claude-code"],
-                    choices=["claude-code", "all"])
+                    choices=["claude-code", "shell-guards", "git-hooks", "all"])
 
     ps = sub.add_parser("serve", help="Start web UI")
     ps.add_argument("--port", type=int, default=7799)

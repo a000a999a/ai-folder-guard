@@ -220,9 +220,18 @@ function loadDir(path, listId) {
 
 function renderBrowser(d, listId) {
   const panel = document.getElementById('browser-' + listId);
+  const labels = {"{{ home }}": "Home", "/mnt": "/mnt"};
   let html = '<div class="browser-bar">';
   if (d.parent) html += '<button type="button" class="btn-nav" data-path="' + esc(d.parent) + '" data-list="' + esc(listId) + '">&#8593; Up</button>';
   html += '<span class="cur-path">' + esc(d.path) + '</span></div>';
+  if (d.roots && d.roots.length > 1) {
+    html += '<div class="browser-bar" style="gap:4px;padding-top:4px;padding-bottom:4px">';
+    for (const r of d.roots) {
+      const lbl = labels[r] || r;
+      html += '<button type="button" class="btn-nav btn-root" data-path="' + esc(r) + '" data-list="' + esc(listId) + '" style="font-size:.75rem;padding:3px 8px">' + esc(lbl) + '</button>';
+    }
+    html += '</div>';
+  }
   html += '<div class="browser-list">';
   for (const name of d.dirs) {
     const full = d.path.replace(/\/?$/, '/') + name;
@@ -323,24 +332,31 @@ def install_claude():
     return redirect(url_for("index"))
 
 
+_ROOTS = [str(Path.home()), "/mnt"]
+
 @app.route("/browse")
 def browse():
     home = Path.home()
     raw = request.args.get("path", str(home))
     p = Path(raw).expanduser().resolve()
-    # Safety: only allow browsing under home
-    try:
-        p.relative_to(home)
-    except ValueError:
-        p = home
-    if not p.is_dir():
+    # Allow browsing under home or /mnt
+    allowed = any(str(p).startswith(r) for r in _ROOTS) or str(p) in _ROOTS
+    if not allowed or not p.is_dir():
         p = home
     try:
         dirs = sorted(d.name for d in p.iterdir() if d.is_dir())
     except PermissionError:
         dirs = []
-    parent = str(p.parent) if p != home else None
-    return json.dumps({"path": str(p), "parent": parent, "dirs": dirs}), 200, {"Content-Type": "application/json"}
+    # Show parent unless we're at a root boundary
+    parent = None
+    if str(p) not in _ROOTS and p != home:
+        parent = str(p.parent)
+    return json.dumps({
+        "path": str(p),
+        "parent": parent,
+        "dirs": dirs,
+        "roots": _ROOTS
+    }), 200, {"Content-Type": "application/json"}
 
 
 if __name__ == "__main__":

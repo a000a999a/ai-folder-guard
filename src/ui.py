@@ -191,7 +191,7 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
 </div>
 
 <script>
-const HOME = {{ home|tojson }};
+const HOME = "{{ home }}";
 let _activeBrowser = null;
 let _activeInput = null;
 let _curPath = {};

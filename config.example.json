@@ -1,0 +1,20 @@
+{
+  "mode": "blacklist",
+  "blocked": [
+    "~/.ssh",
+    "~/.gnupg",
+    "~/.aws",
+    "~/.npmrc",
+    "~/.netrc",
+    "~/.config/anthropic",
+    "~/.local/share/keyrings",
+    "~/Documents/Passwords",
+    "~/Documents/TaxData"
+  ],
+  "allowed": [
+    "~/Projects",
+    "~/.claude"
+  ],
+  "exempt": [],
+  "action": "ask"
+}

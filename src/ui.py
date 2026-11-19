@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """AI Folder Guard — web UI (Flask, localhost:7799)."""
+import json
 import os
 import socket
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 import core
@@ -57,6 +59,20 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
 .log-row{display:grid;grid-template-columns:170px 140px 1fr;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)}
 .log-row:last-child{border:none}
 .ts{color:var(--muted)}
+.path-input-wrap{position:relative;flex:1;min-width:0}
+.path-input-wrap input{width:100%}
+.browser{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:100;background:var(--card);border:1px solid var(--accent);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);overflow:hidden}
+.browser.open{display:block}
+.browser-bar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--bg)}
+.browser-bar .cur-path{font:12px/1.4 monospace;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.browser-bar button{padding:4px 10px;font-size:.8rem}
+.browser-list{max-height:220px;overflow-y:auto}
+.browser-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:.88rem;border-bottom:1px solid var(--border)}
+.browser-item:last-child{border:none}
+.browser-item:hover{background:var(--bg)}
+.browser-item .icon{opacity:.6;font-size:1rem}
+.browser-select{padding:8px 10px;border-top:1px solid var(--border);background:var(--bg)}
+.browser-select button{width:100%;font-size:.85rem}
 </style>
 </head>
 <body>
@@ -106,7 +122,10 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
   </div>
   <form method="post" action="/add" style="margin-top:12px">
     <div class="row">
-      <input type="text" name="path" placeholder="~/Documents/Secrets" required>
+      <div class="path-input-wrap">
+        <input type="text" name="path" id="inp-blocked" placeholder="~/Documents/Secrets or click to browse" autocomplete="off" required>
+        <div class="browser" id="browser-blocked"></div>
+      </div>
       <input type="hidden" name="list" value="blocked">
       <button class="btn-add" type="submit">+ Add</button>
     </div>
@@ -126,7 +145,10 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
   </div>
   <form method="post" action="/add" style="margin-top:12px">
     <div class="row">
-      <input type="text" name="path" placeholder="~/Projects" required>
+      <div class="path-input-wrap">
+        <input type="text" name="path" id="inp-allowed" placeholder="~/Projects or click to browse" autocomplete="off" required>
+        <div class="browser" id="browser-allowed"></div>
+      </div>
       <input type="hidden" name="list" value="allowed">
       <button class="btn-add" type="submit">+ Add</button>
     </div>
@@ -144,7 +166,10 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
   </div>
   <form method="post" action="/add" style="margin-top:12px">
     <div class="row">
-      <input type="text" name="path" placeholder="~/Documents/Secrets/public" required>
+      <div class="path-input-wrap">
+        <input type="text" name="path" id="inp-exempt" placeholder="~/Documents/Secrets/public or click to browse" autocomplete="off" required>
+        <div class="browser" id="browser-exempt"></div>
+      </div>
       <input type="hidden" name="list" value="exempt">
       <button class="btn-add" type="submit">+ Add</button>
     </div>
@@ -164,6 +189,67 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
   {% endif %}
 </div>
 </div>
+
+<script>
+const HOME = {{ home|tojson }};
+let _activeBrowser = null;
+let _activeInput = null;
+let _curPath = {};
+
+function openBrowser(inp, listId) {
+  const panel = document.getElementById('browser-' + listId);
+  if (!panel) return;
+  if (_activeBrowser && _activeBrowser !== panel) closeBrowser();
+  _activeBrowser = panel;
+  _activeInput = inp;
+  panel.classList.add('open');
+  if (!_curPath[listId]) _curPath[listId] = HOME;
+  loadDir(_curPath[listId], listId);
+}
+
+function closeBrowser() {
+  if (_activeBrowser) { _activeBrowser.classList.remove('open'); _activeBrowser = null; }
+}
+
+function loadDir(path, listId) {
+  _curPath[listId] = path;
+  fetch('/browse?path=' + encodeURIComponent(path))
+    .then(r => r.json())
+    .then(d => renderBrowser(d, listId));
+}
+
+function renderBrowser(d, listId) {
+  const panel = document.getElementById('browser-' + listId);
+  let html = '<div class="browser-bar">';
+  if (d.parent) html += '<button type="button" onclick="loadDir(' + JSON.stringify(d.parent) + ',' + JSON.stringify(listId) + ')">&#8593; Up</button>';
+  html += '<span class="cur-path">' + esc(d.path) + '</span></div>';
+  html += '<div class="browser-list">';
+  for (const name of d.dirs) {
+    const full = d.path.replace(/\/?$/, '/') + name;
+    html += '<div class="browser-item" onclick="loadDir(' + JSON.stringify(full) + ',' + JSON.stringify(listId) + ')"><span class="icon">📁</span>' + esc(name) + '</div>';
+  }
+  if (!d.dirs.length) html += '<div class="browser-item" style="color:var(--muted)">No subdirectories</div>';
+  html += '</div>';
+  html += '<div class="browser-select"><button type="button" class="btn-add" onclick="selectPath(' + JSON.stringify(d.path) + ',' + JSON.stringify(listId) + ')">Select this folder</button></div>';
+  panel.innerHTML = html;
+}
+
+function selectPath(path, listId) {
+  if (_activeInput) _activeInput.value = path;
+  closeBrowser();
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+document.addEventListener('click', e => {
+  if (_activeBrowser && !_activeBrowser.contains(e.target) && e.target !== _activeInput) closeBrowser();
+});
+
+document.querySelectorAll('.path-input-wrap input').forEach(inp => {
+  const listId = inp.id.replace('inp-','');
+  inp.addEventListener('focus', () => openBrowser(inp, listId));
+});
+</script>
 </body>
 </html>"""
 
@@ -181,8 +267,10 @@ def index():
     log = core.read_log(50)
     cc_installed = claude_code.is_installed()
     hostname = socket.gethostname()
+    home = str(Path.home())
     t = Template(_HTML)
-    return t.render(cfg=_Obj(cfg), log=log, cc_installed=cc_installed, hostname=hostname)
+    return t.render(cfg=_Obj(cfg), log=log, cc_installed=cc_installed,
+                    hostname=hostname, home=home)
 
 
 @app.route("/add", methods=["POST"])
@@ -224,6 +312,26 @@ def set_field():
 def install_claude():
     claude_code.install()
     return redirect(url_for("index"))
+
+
+@app.route("/browse")
+def browse():
+    home = Path.home()
+    raw = request.args.get("path", str(home))
+    p = Path(raw).expanduser().resolve()
+    # Safety: only allow browsing under home
+    try:
+        p.relative_to(home)
+    except ValueError:
+        p = home
+    if not p.is_dir():
+        p = home
+    try:
+        dirs = sorted(d.name for d in p.iterdir() if d.is_dir())
+    except PermissionError:
+        dirs = []
+    parent = str(p.parent) if p != home else None
+    return json.dumps({"path": str(p), "parent": parent, "dirs": dirs}), 200, {"Content-Type": "application/json"}
 
 
 if __name__ == "__main__":

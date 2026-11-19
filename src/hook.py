@@ -98,7 +98,14 @@ def _check(tool: str, inp: dict, cfg: dict):
         return None
     if tool == "Bash":
         for tok in _SPLIT.split(inp.get("command", "")):
-            if tok and _blocked(tok, cfg):
+            # Only check tokens that look like file paths; skip env var assignments,
+            # PATH-style colon-separated strings, and bare variable names.
+            if not tok or ":" in tok:
+                continue
+            if not (tok.startswith("/") or tok.startswith("~") or
+                    tok.startswith("$HOME") or tok.startswith("${HOME}")):
+                continue
+            if _blocked(tok, cfg):
                 return f"command references protected path '{tok}'"
         return None
     for s in _all_strings(inp):

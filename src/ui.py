@@ -112,6 +112,7 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
   </form>
 </div>
 
+{% if cfg.mode == "whitelist" %}
 <div class="card">
   <h2>Allowed paths <span style="font-weight:400;font-size:.8rem;color:var(--muted)">(whitelist mode)</span></h2>
   <div>
@@ -147,6 +148,7 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
     </div>
   </form>
 </div>
+{% endif %}
 
 <div class="card">
   <h2>Audit log (last 50)</h2>

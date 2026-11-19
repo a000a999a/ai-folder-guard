@@ -23,8 +23,18 @@ _RM_GUARD = """\
 REAL={real}
 
 _dangerous() {{
+    local recursive=0
     for a in "$@"; do
-        case "$a" in -*r*|-*R*|--recursive) return 0;; esac
+        case "$a" in -*r*|-*R*|--recursive) recursive=1;; esac
+    done
+    [ "$recursive" -eq 0 ] && return 1
+    # Allow system temp dirs — git uses rm -rf /tmp/tmp.* internally
+    for a in "$@"; do
+        case "$a" in
+            /tmp/*|/var/tmp/*|/run/tmp/*) ;;
+            -*) ;;
+            *) return 0;;
+        esac
     done
     return 1
 }}

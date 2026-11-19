@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """AI Folder Guard — web UI (Flask, localhost:7799)."""
 import os
+import socket
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -20,13 +21,17 @@ _HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI Folder Guard</title>
+<title>AI Folder Guard — {{ hostname }}</title>
 <style>
-:root{--bg:#f5f5f5;--card:#fff;--fg:#1a1a1a;--muted:#666;--border:#ddd;--accent:#2563eb;--danger:#dc2626;--ok:#16a34a;--input-bg:#fff;color-scheme:light}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f0f0f;--card:#1c1c1c;--fg:#e8e8e8;--muted:#999;--border:#333;--accent:#3b82f6;--danger:#ef4444;--ok:#22c55e;--input-bg:#252525;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0f0f0f;--card:#1c1c1c;--fg:#e8e8e8;--muted:#999;--border:#333;--accent:#3b82f6;--danger:#ef4444;--ok:#22c55e;--input-bg:#252525;color-scheme:dark}
+:root{--bg:#f5f5f5;--card:#fff;--fg:#1a1a1a;--muted:#666;--border:#ddd;--accent:#2563eb;--danger:#dc2626;--ok:#16a34a;--input-bg:#fff;--host-bg:#1e3a5f;--host-fg:#fff;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f0f0f;--card:#1c1c1c;--fg:#e8e8e8;--muted:#999;--border:#333;--accent:#3b82f6;--danger:#ef4444;--ok:#22c55e;--input-bg:#252525;--host-bg:#1e3a5f;--host-fg:#fff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f0f0f;--card:#1c1c1c;--fg:#e8e8e8;--muted:#999;--border:#333;--accent:#3b82f6;--danger:#ef4444;--ok:#22c55e;--input-bg:#252525;--host-bg:#1e3a5f;--host-fg:#fff;color-scheme:dark}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--fg);font:14px/1.6 system-ui,sans-serif;padding:0 max(16px,env(safe-area-inset-left,0px));padding-block:24px}
+body{background:var(--bg);color:var(--fg);font:14px/1.6 system-ui,sans-serif}
+.host-banner{background:var(--host-bg);color:var(--host-fg);padding:20px max(24px,env(safe-area-inset-left,0px));margin-bottom:24px}
+.host-banner .machine{font-size:2rem;font-weight:800;letter-spacing:-.02em;line-height:1}
+.host-banner .sub{font-size:.85rem;opacity:.7;margin-top:4px}
+.content{padding:0 max(16px,env(safe-area-inset-left,0px));padding-bottom:24px}
 h1{font-size:1.3rem;font-weight:700;margin-bottom:4px}
 .sub{color:var(--muted);font-size:.85rem;margin-bottom:24px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px}
@@ -55,8 +60,11 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
 </style>
 </head>
 <body>
-<h1>AI Folder Guard</h1>
-<div class="sub">Filesystem protection for AI coding tools &mdash; <a href="https://github.com/a000a999a/ai-folder-guard" style="color:var(--accent)">GitHub</a></div>
+<div class="host-banner">
+  <div class="machine">{{ hostname }}</div>
+  <div class="sub">AI Folder Guard &mdash; filesystem protection for AI coding tools &mdash; <a href="https://github.com/a000a999a/ai-folder-guard" style="color:rgba(255,255,255,.8)">GitHub</a></div>
+</div>
+<div class="content">
 
 <div class="card">
   <h2>Settings</h2>
@@ -151,6 +159,7 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
   <p style="color:var(--muted);font-size:.9rem">No entries yet.</p>
   {% endif %}
 </div>
+</div>
 </body>
 </html>"""
 
@@ -167,8 +176,9 @@ def index():
     cfg = core.load()
     log = core.read_log(50)
     cc_installed = claude_code.is_installed()
+    hostname = socket.gethostname()
     t = Template(_HTML)
-    return t.render(cfg=_Obj(cfg), log=log, cc_installed=cc_installed)
+    return t.render(cfg=_Obj(cfg), log=log, cc_installed=cc_installed, hostname=hostname)
 
 
 @app.route("/add", methods=["POST"])

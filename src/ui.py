@@ -94,6 +94,7 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
   </div>
 </div>
 
+{% if cfg.mode == "blacklist" %}
 <div class="card">
   <h2>Blocked paths</h2>
   <div>
@@ -111,6 +112,7 @@ select{padding:5px 8px;border:1px solid var(--border);border-radius:6px;backgrou
     </div>
   </form>
 </div>
+{% endif %}
 
 {% if cfg.mode == "whitelist" %}
 <div class="card">

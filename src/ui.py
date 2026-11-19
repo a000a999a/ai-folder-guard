@@ -221,17 +221,26 @@ function loadDir(path, listId) {
 function renderBrowser(d, listId) {
   const panel = document.getElementById('browser-' + listId);
   let html = '<div class="browser-bar">';
-  if (d.parent) html += '<button type="button" onclick="loadDir(' + JSON.stringify(d.parent) + ',' + JSON.stringify(listId) + ')">&#8593; Up</button>';
+  if (d.parent) html += '<button type="button" class="btn-nav" data-path="' + esc(d.parent) + '" data-list="' + esc(listId) + '">&#8593; Up</button>';
   html += '<span class="cur-path">' + esc(d.path) + '</span></div>';
   html += '<div class="browser-list">';
   for (const name of d.dirs) {
     const full = d.path.replace(/\/?$/, '/') + name;
-    html += '<div class="browser-item" onclick="loadDir(' + JSON.stringify(full) + ',' + JSON.stringify(listId) + ')"><span class="icon">📁</span>' + esc(name) + '</div>';
+    html += '<div class="browser-item" data-path="' + esc(full) + '" data-list="' + esc(listId) + '">&#128193; ' + esc(name) + '</div>';
   }
   if (!d.dirs.length) html += '<div class="browser-item" style="color:var(--muted)">No subdirectories</div>';
   html += '</div>';
-  html += '<div class="browser-select"><button type="button" class="btn-add" onclick="selectPath(' + JSON.stringify(d.path) + ',' + JSON.stringify(listId) + ')">Select this folder</button></div>';
+  html += '<div class="browser-select"><button type="button" class="btn-add btn-sel" data-path="' + esc(d.path) + '" data-list="' + esc(listId) + '">Select this folder</button></div>';
   panel.innerHTML = html;
+  panel.querySelectorAll('.browser-item[data-path]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); loadDir(el.dataset.path, el.dataset.list); });
+  });
+  panel.querySelectorAll('.btn-nav').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); loadDir(el.dataset.path, el.dataset.list); });
+  });
+  panel.querySelectorAll('.btn-sel').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); selectPath(el.dataset.path, el.dataset.list); });
+  });
 }
 
 function selectPath(path, listId) {
